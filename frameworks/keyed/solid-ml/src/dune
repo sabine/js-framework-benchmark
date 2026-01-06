@@ -1,0 +1,7 @@
+; solid-ml benchmark implementation
+
+(melange.emit
+ (target output)
+ (libraries solid-ml-browser)
+ (preprocess (pps melange.ppx))
+ (module_systems es6))

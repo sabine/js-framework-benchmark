@@ -1,0 +1,21 @@
+{
+  "name": "js-framework-benchmark-solid-ml",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "dist/main.js",
+  "js-framework-benchmark": {
+    "frameworkVersion": "0.1.0",
+    "frameworkHomeURL": "https://github.com/makerprism/solid-ml"
+  },
+  "scripts": {
+    "build-prod": "echo 'dist/main.js pre-built from solid-ml repo'",
+    "dev": "npm run build-prod"
+  },
+  "author": "solid-ml contributors",
+  "license": "MIT",
+  "homepage": "https://github.com/krausest/js-framework-benchmark",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/sabine/js-framework-benchmark.git"
+  }
+}
