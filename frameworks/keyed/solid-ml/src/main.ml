@@ -155,6 +155,8 @@ let delete idx =
   let d = !data in
   let r = !rows in
   if idx >= 0 && idx < Array.length d then begin
+    (* Check if we're deleting the selected row *)
+    let deleting_selected = !selected_id = Some d.(idx).id in
     (* Remove from DOM *)
     let row = r.(idx) in
     (match Dom.get_parent_element row with
@@ -163,15 +165,8 @@ let delete idx =
     (* Remove from arrays *)
     data := Array.concat [Array.sub d 0 idx; Array.sub d (idx + 1) (Array.length d - idx - 1)];
     rows := Array.concat [Array.sub r 0 idx; Array.sub r (idx + 1) (Array.length r - idx - 1)];
-    (* Handle selection *)
-    unselect ();
-    (* Recreate selection if needed *)
-    match !selected_id with
-    | Some sel_id ->
-      (match find_idx sel_id with
-       | Some sel_idx -> select sel_idx
-       | None -> ())
-    | None -> ()
+    (* Clear selection if we deleted the selected row *)
+    if deleting_selected then unselect ()
   end
 
 (** Remove all rows *)
@@ -252,17 +247,11 @@ let swap_rows () =
     let tmp_r = r.(1) in
     r.(1) <- r.(998);
     r.(998) <- tmp_r;
-    (* Swap in DOM *)
+    (* Swap in DOM: move row at index 1 before row at index 2 *)
     let tbody = get_tbody () in
-    Dom.insert_before tbody (Dom.node_of_element r.(1)) (Dom.node_of_element r.(2));
-    Dom.insert_before tbody (Dom.node_of_element r.(998)) 
-      (match Dom.get_next_sibling r.(998) with
-       | Some next -> next
-       | None -> 
-         (* r.(998) is last, append after r.(997) which is now at position 999 *)
-         match Dom.get_next_sibling r.(997) with
-         | Some n -> n
-         | None -> Dom.node_of_element r.(998)) (* fallback *)
+    Dom.insert_before tbody (Dom.node_of_element r.(1)) (Some (Dom.node_of_element r.(2)));
+    (* Move row at index 998 before its next sibling (or append if last) *)
+    Dom.insert_before tbody (Dom.node_of_element r.(998)) (Dom.get_next_sibling r.(998))
   end
 
 (** {1 Event Handling} *)
