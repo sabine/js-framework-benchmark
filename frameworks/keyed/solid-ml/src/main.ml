@@ -172,60 +172,49 @@ let render_row row =
 let render_keyed_list ~(items : row array Reactive.Signal.t) (parent : Dom.element) =
   (* Map from row id to DOM element *)
   let node_map : (int, Dom.element) Hashtbl.t = Hashtbl.create 1024 in
-  let current_ids : int array ref = ref [||] in
   
   Reactive.Effect.create (fun () ->
     let new_items = Reactive.Signal.get items in
-    let new_ids = Array.map (fun r -> r.id) new_items in
-    let old_ids = !current_ids in
     
     (* Build set of new IDs for O(1) lookup *)
-    let new_id_set = Hashtbl.create (Array.length new_ids) in
-    Array.iter (fun id -> Hashtbl.replace new_id_set id ()) new_ids;
+    let new_id_set = Hashtbl.create (Array.length new_items) in
+    Array.iter (fun row -> Hashtbl.replace new_id_set row.id ()) new_items;
     
     (* Remove nodes that are no longer in the list *)
-    Array.iter (fun old_id ->
-      if not (Hashtbl.mem new_id_set old_id) then begin
-        match Hashtbl.find_opt node_map old_id with
-        | Some node -> 
-          Dom.remove_child parent (Dom.node_of_element node);
-          Hashtbl.remove node_map old_id
-        | None -> ()
-      end
-    ) old_ids;
+    let to_remove = Hashtbl.fold (fun id node acc ->
+      if not (Hashtbl.mem new_id_set id) then (id, node) :: acc else acc
+    ) node_map [] in
+    List.iter (fun (id, node) ->
+      Dom.remove_child parent (Dom.node_of_element node);
+      Hashtbl.remove node_map id
+    ) to_remove;
     
-    (* Get or create nodes for all items *)
+    (* Get or create nodes for all items, appending new ones *)
     let nodes = Array.map (fun row ->
       match Hashtbl.find_opt node_map row.id with
       | Some node -> node
       | None ->
         let node = render_row row in
         Hashtbl.replace node_map row.id node;
+        (* New nodes get appended - will be reordered below *)
+        Dom.append_child parent (Dom.node_of_element node);
         node
     ) new_items in
     
-    (* Reconcile DOM order - use insertBefore for efficiency *)
+    (* Reorder nodes to match new_items order *)
+    (* Simple but correct: iterate and insertBefore the next expected node *)
     let len = Array.length nodes in
-    for i = 0 to len - 1 do
-      let node = nodes.(i) in
-      let current_child = 
-        if i < Array.length old_ids then
-          Hashtbl.find_opt node_map old_ids.(i)
-        else
-          None
-      in
-      (* Insert node at correct position if not already there *)
-      match current_child with
-      | Some curr when curr == node -> () (* Already in place *)
-      | _ ->
-        let next_sibling = 
-          if i + 1 < len then Some (Dom.node_of_element nodes.(i + 1))
-          else None
-        in
-        Dom.insert_before parent (Dom.node_of_element node) next_sibling
-    done;
-    
-    current_ids := new_ids
+    if len > 0 then begin
+      (* Use a reference node approach: insert each node before the next one *)
+      for i = len - 2 downto 0 do
+        let node = nodes.(i) in
+        let next_node = nodes.(i + 1) in
+        (* Only move if not already in correct position *)
+        let prev_sibling = Dom.get_next_sibling node in
+        if prev_sibling <> Some (Dom.node_of_element next_node) then
+          Dom.insert_before parent (Dom.node_of_element node) (Some (Dom.node_of_element next_node))
+      done
+    end
   );
   
   (* Cleanup *)
